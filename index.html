@@ -419,10 +419,49 @@ ticketWrap.addEventListener("click", () => {
 const MAX_ATTEMPTS_PER_DAY = 3;
 let attemptsLeft = MAX_ATTEMPTS_PER_DAY;
 
+/* ── LOCAL DAILY STATE ──
+   Сервер остаётся источником правды для выдачи призов и жёстких лимитов,
+   но локальный счётчик гарантирует, что текст попыток и блокировка кнопки
+   работают корректно даже если ответ сервера нестабилен (меняющийся IP,
+   старый деплой и т.п.). */
+function todayKey() {
+  return new Date().toLocaleDateString('en-CA'); // yyyy-mm-dd в местном часовом поясе
+}
+function loadState() {
+  try {
+    const s = JSON.parse(localStorage.getItem('clawState') || '{}');
+    if (s && s.date === todayKey()) {
+      return { date: s.date, attempts: s.attempts || 0, won: !!s.won };
+    }
+  } catch (e) {}
+  return { date: todayKey(), attempts: 0, won: false };
+}
+function saveState(s) {
+  try { localStorage.setItem('clawState', JSON.stringify(s)); } catch (e) {}
+}
+
+let state = loadState();
+
+/* Восстановить состояние при загрузке страницы */
+function applyInitialLock() {
+  if (state.won) {
+    result.innerText = "Вы уже выиграли сегодня! Приходите завтра.";
+    btn.disabled = true;
+  } else if (state.attempts >= MAX_ATTEMPTS_PER_DAY) {
+    result.innerText = "Попытки на сегодня закончились. Приходите завтра!";
+    btn.disabled = true;
+  }
+}
+applyInitialLock();
+
 playAgain.onclick = () => {
   winOverlay.classList.remove('show');
   copyHint.classList.remove('show');
-  if (attemptsLeft <= 0) {
+  state = loadState();
+  if (state.won) {
+    result.innerText = "Вы уже выиграли сегодня! Приходите завтра.";
+    btn.disabled = true;
+  } else if (state.attempts >= MAX_ATTEMPTS_PER_DAY || attemptsLeft <= 0) {
     result.innerText = "Попытки на сегодня закончились. Приходите завтра!";
     btn.disabled = true;
   } else {
@@ -433,6 +472,19 @@ playAgain.onclick = () => {
 
 /* ── MAIN GAME LOOP ── */
 btn.onclick = async () => {
+  /* Локальная проверка ДО запроса — мгновенно блокирует, если день исчерпан */
+  state = loadState();
+  if (state.won) {
+    result.innerText = "Вы уже выиграли сегодня! Приходите завтра.";
+    btn.disabled = true;
+    return;
+  }
+  if (state.attempts >= MAX_ATTEMPTS_PER_DAY) {
+    result.innerText = "Попытки на сегодня закончились. Приходите завтра!";
+    btn.disabled = true;
+    return;
+  }
+
   btn.disabled = true;
   result.innerText = "Запускаем автомат...";
 
@@ -449,9 +501,13 @@ btn.onclick = async () => {
   if (!data.ok) {
     if (data.error === 'limit_reached') {
       attemptsLeft = 0;
+      state.attempts = MAX_ATTEMPTS_PER_DAY;
+      saveState(state);
       result.innerText = "Лимит попыток на сегодня исчерпан. Приходите завтра!";
     } else if (data.error === 'already_won') {
       attemptsLeft = 0;
+      state.won = true;
+      saveState(state);
       result.innerText = "Вы уже выиграли сегодня! Приходите завтра.";
     } else if (data.error === 'not_started') {
       result.innerText = "Акция ещё не началась. Заходите позже!";
@@ -464,7 +520,15 @@ btn.onclick = async () => {
     return;
   }
 
-  attemptsLeft = data.attemptsLeft;
+  /* Сервер разрешил игру — засчитываем попытку локально и определяем,
+     сколько осталось. Берём минимум серверного и локального значений,
+     чтобы счётчик уменьшался корректно даже при нестабильном ответе. */
+  state.attempts += 1;
+  const localLeft = MAX_ATTEMPTS_PER_DAY - state.attempts;
+  const serverLeft = (typeof data.attemptsLeft === 'number') ? data.attemptsLeft : localLeft;
+  attemptsLeft = Math.max(0, Math.min(serverLeft, localLeft));
+  if (data.win) state.won = true;
+  saveState(state);
   result.innerText = "";
 
   /* Pick a random horizontal spot; descend to the same fixed depth every time */
