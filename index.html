@@ -362,14 +362,14 @@ function moveWire(y, transition) {
 
 /* ── RESET CLAW ── */
 async function resetClaw() {
-  const t = "1.3s cubic-bezier(.2,.9,.2,1)";
+  const t = "0.9s cubic-bezier(.2,.9,.2,1)";
   claw.style.transition = t;
   claw.style.top        = "0px";
   claw.style.left       = "50%";
   claw.style.transform  = "translateX(-50%)";
   moveWire(0, t);
   clawImg.src = CLAW_OPEN;
-  await wait(1300);
+  await wait(900);
 }
 
 /* ── CONFETTI ── */
@@ -434,7 +434,7 @@ playAgain.onclick = () => {
 /* ── MAIN GAME LOOP ── */
 btn.onclick = async () => {
   btn.disabled = true;
-  result.innerText = "";
+  result.innerText = "Запускаем автомат...";
 
   /* 0. Спросить сервер заранее, можно ли играть */
   let data;
@@ -462,6 +462,7 @@ btn.onclick = async () => {
   }
 
   attemptsLeft = data.attemptsLeft;
+  result.innerText = "";
 
   /* Pick a random horizontal spot; descend to the same fixed depth every time */
   const a = area.getBoundingClientRect();
@@ -469,18 +470,18 @@ btn.onclick = async () => {
   const y = a.height - 70;
 
   /* 1. Move horizontally */
-  const tH = "1.2s cubic-bezier(.2,.9,.2,1)";
+  const tH = "0.8s cubic-bezier(.2,.9,.2,1)";
   claw.style.transition = tH;
   claw.style.left = x + "px";
   sound("motor");
-  await wait(950);
+  await wait(650);
 
   /* 2. Descend */
-  const tV = "1s cubic-bezier(.2,.7,.2,1)";
+  const tV = "0.7s cubic-bezier(.2,.7,.2,1)";
   claw.style.transition = tV;
   claw.style.top = y + "px";
   moveWire(y, tV);
-  await wait(1000);
+  await wait(700);
 
   /* 3. Close claw */
   clawImg.src = CLAW_CLOSED;
@@ -492,7 +493,7 @@ btn.onclick = async () => {
 
   /* 4. Result */
   sound(data.win ? "win" : "drop");
-  await wait(400);
+  await wait(250);
 
   /* 5. Return claw */
   await resetClaw();

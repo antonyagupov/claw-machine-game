@@ -48,7 +48,7 @@ function doPost(e) {
       }
 
       const usersSheet = ss.getSheetByName(SHEET_USERS);
-      const attemptsToday = countByDate(usersSheet, 0, 1, userId, todayStr, tz);
+      const attemptsToday = countByDate(usersSheet, 1, 0, userId, todayStr, tz);
 
       if (attemptsToday >= MAX_ATTEMPTS_PER_DAY) {
         return jsonResponse({
@@ -65,13 +65,12 @@ function doPost(e) {
 
       const winLogSheet = ss.getSheetByName(SHEET_WINLOG);
       const winsToday = countByDate(winLogSheet, 0, null, null, todayStr, tz);
-      const userWinsToday = countByDate(winLogSheet, 0, 2, userId, todayStr, tz);
 
       let win = false;
       let promoCode = '';
 
-      // Не более 1 выигрыша на пользователя в день + общий дневной лимит призов
-      if (userWinsToday < 1 && winsToday < config.dailyWins && Math.random() < WIN_CHANCE) {
+      // Общий дневной лимит призов на всех пользователей (config.dailyWins, обычно = 1)
+      if (winsToday < config.dailyWins && Math.random() < WIN_CHANCE) {
         promoCode = pickPromoCode(ss);
         if (promoCode) {
           win = true;
