@@ -48,7 +48,19 @@ function doPost(e) {
       }
 
       const usersSheet = ss.getSheetByName(SHEET_USERS);
+      const winLogSheet = ss.getSheetByName(SHEET_WINLOG);
+
       const attemptsToday = countByDate(usersSheet, 1, 0, userId, todayStr, tz);
+      const userWonToday  = countByDate(winLogSheet, 0, 2, userId, todayStr, tz) > 0;
+
+      if (userWonToday) {
+        return jsonResponse({
+          ok: false,
+          error: 'already_won',
+          message: 'Вы уже выиграли сегодня! Приходите завтра.',
+          attemptsLeft: 0
+        });
+      }
 
       if (attemptsToday >= MAX_ATTEMPTS_PER_DAY) {
         return jsonResponse({
@@ -63,7 +75,6 @@ function doPost(e) {
       const attemptNumber = attemptsToday + 1;
       usersSheet.appendRow([userId, new Date()]);
 
-      const winLogSheet = ss.getSheetByName(SHEET_WINLOG);
       const winsToday = countByDate(winLogSheet, 0, null, null, todayStr, tz);
 
       let win = false;

@@ -450,6 +450,9 @@ btn.onclick = async () => {
     if (data.error === 'limit_reached') {
       attemptsLeft = 0;
       result.innerText = "Лимит попыток на сегодня исчерпан. Приходите завтра!";
+    } else if (data.error === 'already_won') {
+      attemptsLeft = 0;
+      result.innerText = "Вы уже выиграли сегодня! Приходите завтра.";
     } else if (data.error === 'not_started') {
       result.innerText = "Акция ещё не началась. Заходите позже!";
     } else if (data.error === 'ended') {
