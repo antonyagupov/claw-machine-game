@@ -422,8 +422,13 @@ let attemptsLeft = MAX_ATTEMPTS_PER_DAY;
 playAgain.onclick = () => {
   winOverlay.classList.remove('show');
   copyHint.classList.remove('show');
-  result.innerHTML = '';
-  btn.disabled = attemptsLeft <= 0;
+  if (attemptsLeft <= 0) {
+    result.innerText = "Попытки на сегодня закончились. Приходите завтра!";
+    btn.disabled = true;
+  } else {
+    result.innerHTML = '';
+    btn.disabled = false;
+  }
 };
 
 /* ── MAIN GAME LOOP ── */

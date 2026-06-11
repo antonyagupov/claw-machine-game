@@ -18,7 +18,8 @@
       "Bash(cwebp -q 85 -resize 240 0 \"magnific_3d-claw-machine-.-.-.-.-3_YVJeBNjWeC 2.png\" -o \"claw-closed.webp\")",
       "Bash(cwebp -q 85 -resize 600 0 \"magnific_kLoHMNB16B 1.png\" -o \"ticket.webp\")",
       "Bash(cwebp -q 90 -resize 200 0 \"start-btn.png\" -o \"start-btn.webp\")",
-      "Bash(rm -f *.png && ls -la)"
+      "Bash(rm -f *.png && ls -la)",
+      "Bash(git push *)"
     ]
   }
 }
