@@ -6,7 +6,7 @@
  *   USERS:      userId | date  (одна строка = одна попытка)
  *   WIN_LOG:    date | code | userId
  */
-const SPREADSHEET_ID = 'ВСТАВЬТЕ_СЮДА_ID_ВАШЕЙ_ТАБЛИЦЫ';
+const SPREADSHEET_ID = '1MI7F6g9TiCGI8giOA2Pl5UpxUMQyZL7-H1QFPy0XhJE';
 
 const SHEET_PROMO   = 'PROMOCODES';
 const SHEET_CONFIG  = 'CONFIG';
@@ -105,6 +105,44 @@ function doPost(e) {
 }
 
 function doGet(e) {
+  // Диагностика: /exec?debug=claw — показывает конфиг и счётчики за сегодня.
+  // Удобно, чтобы удалённо проверить, что лимиты считаются правильно.
+  if (e && e.parameter && e.parameter.debug === 'claw') {
+    try {
+      const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+      const tz = Session.getScriptTimeZone();
+      const todayStr = Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd');
+      const config = readConfig(ss, tz);
+      const usersSheet  = ss.getSheetByName(SHEET_USERS);
+      const winLogSheet = ss.getSheetByName(SHEET_WINLOG);
+      const promoSheet  = ss.getSheetByName(SHEET_PROMO);
+
+      let promoFree = 0, promoTotal = 0;
+      if (promoSheet) {
+        const pd = promoSheet.getDataRange().getValues();
+        for (let i = 1; i < pd.length; i++) {
+          if (!pd[i][0]) continue;
+          promoTotal++;
+          const used = pd[i][1] === true || String(pd[i][1]).toUpperCase() === 'TRUE';
+          if (!used) promoFree++;
+        }
+      }
+
+      return jsonResponse({
+        ok: true,
+        debug: true,
+        timezone: tz,
+        today: todayStr,
+        config: config,
+        attemptsTodayTotal: usersSheet  ? countByDate(usersSheet, 1, null, null, todayStr, tz) : null,
+        winsTodayTotal:     winLogSheet ? countByDate(winLogSheet, 0, null, null, todayStr, tz) : null,
+        promoFree: promoFree,
+        promoTotal: promoTotal
+      });
+    } catch (err) {
+      return jsonResponse({ ok: false, error: 'debug_error', message: err.toString() });
+    }
+  }
   return jsonResponse({ ok: true, message: 'Game stats API работает' });
 }
 
@@ -129,17 +167,41 @@ function readConfig(ss, tz) {
 }
 
 /**
+ * Приводит значение ячейки с датой к строке yyyy-MM-dd, понимая
+ * как настоящие Date-объекты, так и даты, сохранённые как ТЕКСТ
+ * (например, если колонка отформатирована как «Обычный текст»).
+ * Возвращает '' если распознать не удалось.
+ */
+function toDateStr(val, tz) {
+  if (val instanceof Date) {
+    return Utilities.formatDate(val, tz, 'yyyy-MM-dd');
+  }
+  if (val !== null && val !== undefined && String(val).trim() !== '') {
+    const s = String(val).trim();
+    // Уже в формате yyyy-MM-dd…
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (m) return m[1] + '-' + m[2] + '-' + m[3];
+    // Иначе пробуем распарсить как дату
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) {
+      return Utilities.formatDate(d, tz, 'yyyy-MM-dd');
+    }
+  }
+  return '';
+}
+
+/**
  * Считает строки за сегодняшнюю дату (колонка dateCol), опционально
  * фильтруя по совпадению значения userId в колонке userCol.
+ * Устойчива к датам, сохранённым как текст, и к лишним пробелам в userId.
  */
 function countByDate(sheet, dateCol, userCol, userId, todayStr, tz) {
   const data = sheet.getDataRange().getValues();
+  const target = userId === null || userId === undefined ? null : String(userId).trim();
   let count = 0;
   for (let i = 1; i < data.length; i++) {
-    const rowDate = data[i][dateCol];
-    if (!(rowDate instanceof Date)) continue;
-    if (Utilities.formatDate(rowDate, tz, 'yyyy-MM-dd') !== todayStr) continue;
-    if (userCol !== null && data[i][userCol] !== userId) continue;
+    if (toDateStr(data[i][dateCol], tz) !== todayStr) continue;
+    if (userCol !== null && String(data[i][userCol]).trim() !== target) continue;
     count++;
   }
   return count;
