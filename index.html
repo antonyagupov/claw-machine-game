@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>МЕСТО ВСТРЕЧИ — Хватайка</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #07071a;
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Arial Black', Arial, sans-serif;
+}
+
+#game {
+  position: relative;
+  width: min(430px, 100vw);
+}
+
+#machine-img {
+  width: 100%;
+  display: block;
+  pointer-events: none;
+  user-select: none;
+  border-radius: 10px;
+}
+
+/* Glass overlay — claw lives here, no items */
+#area {
+  position: absolute;
+  top: 19.96%;
+  left: 10.5%;
+  width: 79%;
+  height: 63%;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+/* Claw container */
+#claw {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+  width: 72px;
+  z-index: 20;
+  pointer-events: none;
+  will-change: left, top, transform;
+}
+
+/* Wire — anchored to the claw, stretches up to the top of the area.
+   Being a child of #claw means it always tracks the claw's horizontal
+   position exactly, with no separate transition to fall out of sync. */
+#wire {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  width: 4px;
+  height: 0;
+  transform: translateX(-50%);
+  background: linear-gradient(to bottom, #444, #999);
+  border-radius: 2px;
+  pointer-events: none;
+}
+
+/* Show only claw head, crop out cable from image */
+#claw-head {
+  width: 72px;
+  height: 62px;
+  overflow: hidden;
+}
+
+#claw-img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: cover;
+  object-position: bottom center;
+  /* invert + screen = white bg disappears, dark metal becomes bright chrome */
+  filter: invert(1) brightness(0.85);
+  mix-blend-mode: screen;
+}
+
+/* START button — graphical, placed on the control panel of the machine */
+#btn {
+  position: absolute;
+  left: 60%;
+  top: 92%;
+  transform: translate(-50%, -50%);
+  width: clamp(64px, 19%, 92px);
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  z-index: 30;
+  transition: transform 0.08s, filter 0.15s;
+}
+#btn-img {
+  width: 100%;
+  display: block;
+  pointer-events: none;
+  user-select: none;
+  filter: drop-shadow(0 4px 10px rgba(0,0,0,0.55));
+  transition: filter 0.15s;
+}
+#btn:hover:not(:disabled) #btn-img {
+  filter: drop-shadow(0 4px 14px rgba(255,60,60,0.7)) brightness(1.08);
+}
+#btn:active:not(:disabled) {
+  transform: translate(-50%, -46%);
+}
+#btn:active:not(:disabled) #btn-img {
+  filter: drop-shadow(0 2px 6px rgba(255,60,60,0.5)) brightness(0.95);
+}
+#btn:disabled { opacity: 1; cursor: not-allowed; }
+#btn:disabled #btn-img { filter: drop-shadow(0 4px 10px rgba(0,0,0,0.55)) saturate(0.6); }
+
+/* Result text */
+#result {
+  margin-top: 10px;
+  text-align: center;
+  color: rgba(255,255,255,0.7);
+  font-size: clamp(11px, 3.5vw, 13px);
+  font-family: Arial, sans-serif;
+  min-height: 2em;
+  padding: 0 12px;
+  line-height: 1.5;
+}
+
+/* Win overlay */
+#win-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(4, 4, 18, 0.92);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  border-radius: 10px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.35s ease;
+}
+#win-overlay.show { opacity: 1; pointer-events: all; }
+
+#win-title {
+  color: #ffd700;
+  font-size: clamp(20px, 6vw, 26px);
+  font-weight: 900;
+  letter-spacing: 3px;
+  margin-bottom: 20px;
+  animation: glow 1.4s infinite alternate;
+}
+@keyframes glow {
+  from { text-shadow: 0 0 8px rgba(255,215,0,0.5); }
+  to   { text-shadow: 0 0 24px rgba(255,215,0,1), 0 0 50px rgba(255,180,0,0.5); }
+}
+
+/* Ticket — tilted, animated entry then float+sway */
+#ticket-wrap {
+  position: relative;
+  width: clamp(210px, 72%, 260px);
+  cursor: pointer;
+  animation: ticketDrop 0.7s cubic-bezier(.2,1.4,.4,1) both,
+             ticketFloat 3.5s 0.7s ease-in-out infinite;
+  transform-origin: center center;
+  -webkit-tap-highlight-color: transparent;
+}
+#ticket-wrap:active { filter: brightness(1.15); }
+
+@keyframes ticketDrop {
+  0%   { opacity: 0; transform: rotate(-8deg) translateY(-60px) scale(0.85); }
+  100% { opacity: 1; transform: rotate(-8deg) translateY(0)     scale(1); }
+}
+@keyframes ticketFloat {
+  0%,100% { transform: rotate(-8deg) translateY(0);   }
+  25%     { transform: rotate(-7deg) translateY(-6px); }
+  75%     { transform: rotate(-9deg) translateY(-3px); }
+}
+
+#ticket-img {
+  width: 100%;
+  display: block;
+  filter: drop-shadow(0 10px 30px rgba(200,155,0,0.65))
+          drop-shadow(0 2px 6px rgba(0,0,0,0.5));
+}
+
+/* Promo code — stamped below ВЫИГРЫШ */
+#promo-code {
+  position: absolute;
+  bottom: 23%;
+  left: 52%;
+  transform: translateX(-50%) rotate(355deg);
+  font-size: clamp(14px, 4.5vw, 19px);
+  font-weight: 900;
+  color: #2a1400;
+  letter-spacing: 4px;
+  font-family: 'Courier New', monospace;
+  white-space: nowrap;
+  text-shadow: 0 1px 0 rgba(255,200,80,0.4);
+  /* stamp effect */
+  border: 2px solid rgba(42,20,0,0.35);
+  border-radius: 3px;
+  padding: 2px 8px;
+  background: rgba(255,200,80,0.18);
+}
+
+/* Copy hint toast */
+#copy-hint {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-46%) rotate(356deg);
+  color: rgba(255,215,0,0.9);
+  font-size: 11px;
+  font-family: Arial, sans-serif;
+  letter-spacing: 1px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+#copy-hint.show { opacity: 1; }
+
+#play-again {
+  margin-top: 32px;
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.8);
+  border: 1px solid rgba(255,255,255,0.2);
+  padding: 10px 28px;
+  border-radius: 24px;
+  cursor: pointer;
+  font-size: clamp(12px, 3.5vw, 13px);
+  font-family: Arial, sans-serif;
+  letter-spacing: 1px;
+  transition: background 0.2s;
+}
+#play-again:hover { background: rgba(255,255,255,0.16); }
+
+/* Confetti */
+.confetti {
+  position: absolute;
+  pointer-events: none;
+  z-index: 55;
+  animation: fall linear forwards;
+}
+@keyframes fall {
+  0%   { transform: translateY(0) rotate(0deg);   opacity: 1; }
+  100% { transform: translateY(350px) rotate(720deg); opacity: 0; }
+}
+</style>
+</head>
+<body>
+
+<div id="game">
+  <img id="machine-img"
+       src="magnific_claw-machine-.-.-img1-img_jSmKXE2LD0%203.png"
+       alt="Claw Machine">
+
+  <div id="area">
+    <div id="claw">
+      <div id="wire"></div>
+      <div id="claw-head">
+        <img id="claw-img"
+             src="magnific_3d-claw-machine-.-.-.-.-3_YVJeBNjWeC%201.png"
+             alt="claw">
+      </div>
+    </div>
+  </div>
+
+  <button id="btn">
+    <img id="btn-img" src="start-btn.png" alt="СТАРТ">
+  </button>
+
+  <div id="win-overlay">
+    <div id="win-title">ПОБЕДА!</div>
+    <div id="ticket-wrap">
+      <img id="ticket-img" src="magnific_kLoHMNB16B%201.png" alt="Выигрыш">
+      <div id="promo-code"></div>
+      <div id="copy-hint">✓ скопировано</div>
+    </div>
+    <button id="play-again">Сыграть ещё</button>
+  </div>
+</div>
+
+<div id="result"></div>
+
+<script>
+const CLAW_OPEN   = "magnific_3d-claw-machine-.-.-.-.-3_YVJeBNjWeC%201.png";
+const CLAW_CLOSED = "magnific_3d-claw-machine-.-.-.-.-3_YVJeBNjWeC%202.png";
+
+const area       = document.getElementById("area");
+const wire       = document.getElementById("wire");
+const claw       = document.getElementById("claw");
+const clawImg    = document.getElementById("claw-img");
+const result     = document.getElementById("result");
+const btn        = document.getElementById("btn");
+const winOverlay = document.getElementById("win-overlay");
+const promoCode  = document.getElementById("promo-code");
+const ticketWrap = document.getElementById("ticket-wrap");
+const copyHint   = document.getElementById("copy-hint");
+const playAgain  = document.getElementById("play-again");
+
+/* ── BACKEND (Google Apps Script Web App) ── */
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwHi4GsGNXeWIKXBe90-l57TUcYUeWGvG4Y5g62PKlUK7udz8CTT770IHwUtlJf2x2UVQ/exec";
+
+let cachedIp = null;
+async function getClientIp() {
+  if (cachedIp) return cachedIp;
+  try {
+    const r = await fetch("https://api.ipify.org?format=json");
+    const d = await r.json();
+    cachedIp = d.ip;
+  } catch (err) {
+    cachedIp = "unknown";
+  }
+  return cachedIp;
+}
+
+async function callServer() {
+  const ip = await getClientIp();
+  // Content-Type: text/plain избегает CORS-preflight для Apps Script
+  const resp = await fetch(APPS_SCRIPT_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ ip })
+  });
+  return resp.json();
+}
+
+function attemptsWord(n) {
+  const mod10 = n % 10, mod100 = n % 100;
+  if (mod10 === 1 && mod100 !== 11) return "попытка";
+  if ([2, 3, 4].includes(mod10) && ![12, 13, 14].includes(mod100)) return "попытки";
+  return "попыток";
+}
+
+/* ── SOUND ── */
+let audioCtx;
+function sound(type) {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.connect(g); g.connect(audioCtx.destination);
+  o.frequency.value = { motor: 220, grab: 520, win: 1040, drop: 120 }[type] || 220;
+  g.gain.value = 0.05;
+  o.start();
+  setTimeout(() => o.stop(), 180);
+}
+
+/* ── WIRE HELPER — height tracks the claw's "top" so it always reaches it ── */
+function moveWire(y, transition) {
+  wire.style.transition = transition;
+  wire.style.height = y + "px";
+}
+
+/* ── RESET CLAW ── */
+async function resetClaw() {
+  const t = "1.3s cubic-bezier(.2,.9,.2,1)";
+  claw.style.transition = t;
+  claw.style.top        = "0px";
+  claw.style.left       = "50%";
+  claw.style.transform  = "translateX(-50%)";
+  moveWire(0, t);
+  clawImg.src = CLAW_OPEN;
+  await wait(1300);
+}
+
+/* ── CONFETTI ── */
+function spawnConfetti() {
+  const colors = ['#ffd700','#ff6b6b','#4ecdc4','#45b7d1','#96e6a1','#f7dc6f'];
+  const game = document.getElementById('game');
+  for (let i = 0; i < 28; i++) {
+    setTimeout(() => {
+      const c = document.createElement('div');
+      c.className = 'confetti';
+      c.style.cssText = `
+        left:${10 + Math.random() * 80}%;top:10%;
+        background:${colors[Math.floor(Math.random() * colors.length)]};
+        width:${6 + Math.random() * 7}px;height:${6 + Math.random() * 7}px;
+        border-radius:${Math.random() > 0.5 ? '50%' : '2px'};
+        animation-duration:${1.4 + Math.random() * 1.6}s;
+      `;
+      game.appendChild(c);
+      setTimeout(() => c.remove(), 3200);
+    }, i * 55);
+  }
+}
+
+/* ── WIN UI ── */
+function showWin(code) {
+  promoCode.textContent = code;
+  // re-trigger ticket drop animation
+  ticketWrap.style.animation = "none";
+  ticketWrap.offsetHeight; // reflow
+  ticketWrap.style.animation = "";
+  winOverlay.classList.add('show');
+  spawnConfetti();
+}
+
+/* ── COPY ON CLICK ── */
+let copyTimer;
+ticketWrap.addEventListener("click", () => {
+  const code = promoCode.textContent;
+  if (!code) return;
+  navigator.clipboard.writeText(code).then(() => {
+    copyHint.classList.add("show");
+    clearTimeout(copyTimer);
+    copyTimer = setTimeout(() => copyHint.classList.remove("show"), 2000);
+  });
+});
+
+const MAX_ATTEMPTS_PER_DAY = 3;
+let attemptsLeft = MAX_ATTEMPTS_PER_DAY;
+
+playAgain.onclick = () => {
+  winOverlay.classList.remove('show');
+  copyHint.classList.remove('show');
+  result.innerHTML = '';
+  btn.disabled = attemptsLeft <= 0;
+};
+
+/* ── MAIN GAME LOOP ── */
+btn.onclick = async () => {
+  btn.disabled = true;
+  result.innerText = "";
+
+  /* 0. Спросить сервер заранее, можно ли играть */
+  let data;
+  try {
+    data = await callServer();
+  } catch (err) {
+    result.innerText = "Ошибка соединения. Попробуйте позже.";
+    btn.disabled = false;
+    return;
+  }
+
+  if (!data.ok) {
+    if (data.error === 'limit_reached') {
+      attemptsLeft = 0;
+      result.innerText = "Лимит попыток на сегодня исчерпан. Приходите завтра!";
+    } else if (data.error === 'not_started') {
+      result.innerText = "Акция ещё не началась. Заходите позже!";
+    } else if (data.error === 'ended') {
+      result.innerText = "Акция уже завершена.";
+    } else {
+      result.innerText = "Ошибка: " + (data.message || data.error);
+      btn.disabled = false;
+    }
+    return;
+  }
+
+  attemptsLeft = data.attemptsLeft;
+
+  /* Pick a random horizontal spot; descend to the same fixed depth every time */
+  const a = area.getBoundingClientRect();
+  const x = 20 + Math.random() * (a.width  - 40);
+  const y = a.height - 70;
+
+  /* 1. Move horizontally */
+  const tH = "1.2s cubic-bezier(.2,.9,.2,1)";
+  claw.style.transition = tH;
+  claw.style.left = x + "px";
+  sound("motor");
+  await wait(950);
+
+  /* 2. Descend */
+  const tV = "1s cubic-bezier(.2,.7,.2,1)";
+  claw.style.transition = tV;
+  claw.style.top = y + "px";
+  moveWire(y, tV);
+  await wait(1000);
+
+  /* 3. Close claw */
+  clawImg.src = CLAW_CLOSED;
+  claw.style.transition = "0.08s";
+  claw.style.transform = "translateX(-50%) scale(1.06)";
+  sound("grab");
+  await wait(220);
+  claw.style.transform = "translateX(-50%) scale(1)";
+
+  /* 4. Result */
+  sound(data.win ? "win" : "drop");
+  await wait(400);
+
+  /* 5. Return claw */
+  await resetClaw();
+
+  /* 6. UI */
+  if (data.win) {
+    showWin(data.promoCode);
+  } else if (attemptsLeft > 0) {
+    result.innerText = `Почти получилось... ещё ${attemptsLeft} ${attemptsWord(attemptsLeft)} сегодня.`;
+    btn.disabled = false;
+  } else {
+    result.innerText = "Почти получилось... попытки на сегодня закончились.";
+  }
+};
+
+function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+</script>
+</body>
+</html>
