@@ -7,7 +7,18 @@
       "Bash(git --version)",
       "Bash(brew install *)",
       "Bash(git init *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(gh --version)",
+      "Bash(git -C /Users/antonagupov/Documents/DEV/claw config user.email)",
+      "Bash(git -C /Users/antonagupov/Documents/DEV/claw config user.name)",
+      "Bash(git config *)",
+      "Bash(git commit *)",
+      "Bash(cwebp -q 80 -resize 900 0 \"magnific_claw-machine-.-.-img1-img_jSmKXE2LD0 3.png\" -o \"machine.webp\")",
+      "Bash(cwebp -q 85 -resize 240 0 \"magnific_3d-claw-machine-.-.-.-.-3_YVJeBNjWeC 1.png\" -o \"claw-open.webp\")",
+      "Bash(cwebp -q 85 -resize 240 0 \"magnific_3d-claw-machine-.-.-.-.-3_YVJeBNjWeC 2.png\" -o \"claw-closed.webp\")",
+      "Bash(cwebp -q 85 -resize 600 0 \"magnific_kLoHMNB16B 1.png\" -o \"ticket.webp\")",
+      "Bash(cwebp -q 90 -resize 200 0 \"start-btn.png\" -o \"start-btn.webp\")",
+      "Bash(rm -f *.png && ls -la)"
     ]
   }
 }
